@@ -50,7 +50,7 @@ plt.ylabel('Execution Time (milliseconds)', fontsize=12)
 plt.grid(True, linestyle='--', alpha=0.7)
 plt.legend(fontsize=12)
 
-# Lưu biểu đồ ra file ảnh để đưa vào báo cáo
+# Lưu biểu đồ ra file ảnh
 plt.savefig('n_plus_1_problem_chart.png', dpi=300, bbox_inches='tight')
 print(" Đã lưu biểu đồ thành công: n_plus_1_problem_chart.png")
 
