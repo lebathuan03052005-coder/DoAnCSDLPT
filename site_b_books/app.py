@@ -9,7 +9,7 @@ base_dir = os.path.dirname(os.path.abspath(__file__))
 data_path = os.path.join(base_dir, '../data/books.json')
 
 with open(data_path, 'r', encoding='utf-8') as f:
-    books_data = json.load(f)
+    books_data = json.load(f)   
 
 # API LAZY LOADING 
 @app.route('/api/books/author/<int:author_id>', methods=['GET'])
