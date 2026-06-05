@@ -1,5 +1,6 @@
 import requests
 import matplotlib.pyplot as plt
+import sys
 
 # Địa chỉ của Site A (Author Service)
 SITE_A_URL = "http://localhost:5001"
@@ -15,14 +16,35 @@ print("Bắt đầu chạy kịch bản Test...\n" + "-"*40)
 for limit in author_limits:
     print(f" Đang test với {limit} tác giả...")
     
+    # ---------------------------------------------------------
     # 1. Test Lazy Loading
-    res_lazy = requests.get(f"{SITE_A_URL}/test/lazy?limit={limit}").json()
+    # ---------------------------------------------------------
+    response_lazy = requests.get(f"{SITE_A_URL}/test/lazy?limit={limit}")
+    
+    # KIỂM TRA LỖI TRƯỚC KHI LẤY DỮ LIỆU
+    if response_lazy.status_code != 200:
+        error_info = response_lazy.json()
+        print(f"\n[LỖI MẠNG] {error_info.get('message', 'Mất kết nối!')}")
+        print(" TẠM DỪNG BÀI TEST DO MẤT KẾT NỐI NODE B (SQL SERVER).")
+        sys.exit() # Dừng hẳn script, không vẽ biểu đồ nữa
+        
+    res_lazy = response_lazy.json()
     lazy_time = res_lazy['execution_time_ms']
     lazy_times.append(lazy_time)
     print(f"   - Lazy Loading: {lazy_time} ms (Số lần gọi mạng: {res_lazy['network_calls']})")
     
+    # ---------------------------------------------------------
     # 2. Test Eager Loading
-    res_eager = requests.get(f"{SITE_A_URL}/test/eager?limit={limit}").json()
+    # ---------------------------------------------------------
+    response_eager = requests.get(f"{SITE_A_URL}/test/eager?limit={limit}")
+    
+    if response_eager.status_code != 200:
+        error_info = response_eager.json()
+        print(f"\n[LỖI MẠNG] {error_info.get('message', 'Mất kết nối!')}")
+        print(" TẠM DỪNG BÀI TEST DO MẤT KẾT NỐI NODE B (SQL SERVER).")
+        sys.exit()
+        
+    res_eager = response_eager.json()
     eager_time = res_eager['execution_time_ms']
     eager_times.append(eager_time)
     print(f"   - Eager Loading: {eager_time} ms (Số lần gọi mạng: {res_eager['network_calls']})")
