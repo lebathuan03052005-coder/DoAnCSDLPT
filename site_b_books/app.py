@@ -21,7 +21,7 @@ def get_books_by_author(author_id):
 # API EAGER LOADING
 @app.route('/api/books/all', methods=['GET'])
 def get_all_books():
-    time.sleep(0.05) # Mạng chậm 50ms, nhưng Eager chỉ phải chịu 1 lần duy nhất
+    time.sleep(0.05) # Mạng chậm 50ms
     return jsonify(books_data)
 
 if __name__ == '__main__':

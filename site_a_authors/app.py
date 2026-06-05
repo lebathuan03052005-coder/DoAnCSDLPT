@@ -15,30 +15,33 @@ with open(data_path, 'r', encoding='utf-8') as f:
 
 SITE_B_URL = "http://localhost:5002"
 NETWORK_LATENCY = 0.05 
-#  Khai báo hằng số độ trễ mạng 50ms ( điều chỉnh để thử nghiệm với các mức độ trễ khác nhau) 
+#  Khai báo hằng số độ trễ mạng 50ms 
 
 
 # CHIẾN LƯỢC 1: LAZY LOADING
-
 @app.route('/test/lazy', methods=['GET'])
 def lazy_loading():
     limit = int(request.args.get('limit', 10))
-    #  Dùng deepcopy để không làm hỏng dữ liệu gốc trong RAM
     authors_to_fetch = copy.deepcopy(authors_data[:limit]) 
     
     start_time = time.time()
     network_calls = 0
     
     for author in authors_to_fetch:
-        time.sleep(NETWORK_LATENCY) #  Giả lập độ trễ cho MỖI request
+        time.sleep(NETWORK_LATENCY)
         
-        response = requests.get(f"{SITE_B_URL}/api/books/author/{author['AuthorID']}")
-        
-        # Chỉ gán sách khi request thành công (tránh lỗi nếu Site B sập)
-        if response.status_code == 200:
-            author['books'] = response.json()
-        else:
-            author['books'] = []
+        # Bắt đầu khối xử lý lỗi
+        try:
+            # Thêm timeout=1 để nếu Site B sập, nó sẽ báo lỗi ngay sau 1 giây thay vì treo
+            response = requests.get(f"{SITE_B_URL}/api/books/author/{author['AuthorID']}", timeout=1)
+            
+            if response.status_code == 200:
+                author['books'] = response.json()
+            else:
+                author['books'] = []
+        except requests.exceptions.RequestException:
+            # Nếu bắt được lỗi mất kết nối, hệ thống không crash mà gán cảnh báo
+            author['books'] = "LOI: Book Service Site B hien dang mat ket noi!"
             
         network_calls += 1
         
@@ -48,40 +51,47 @@ def lazy_loading():
         "strategy": "Lazy Loading (N+1)",
         "authors_count": limit,
         "network_calls": network_calls,
-        "execution_time_ms": round((end_time - start_time) * 1000, 2)
+        "execution_time_ms": round((end_time - start_time) * 1000, 2),
+        "data": authors_to_fetch 
     })
 
 
 # CHIẾN LƯỢC 2: EAGER LOADING
-
 @app.route('/test/eager', methods=['GET'])
 def eager_loading():
     limit = int(request.args.get('limit', 10))
-    # Dùng deepcopy để không làm hỏng dữ liệu gốc trong RAM
     authors_to_fetch = copy.deepcopy(authors_data[:limit]) 
     
     start_time = time.time()
     network_calls = 0
     
-    time.sleep(NETWORK_LATENCY) # Giả lập độ trễ cho request duy nhất
+    time.sleep(NETWORK_LATENCY) 
     
-    response = requests.get(f"{SITE_B_URL}/api/books/all")
-    network_calls += 1
-    
-    if response.status_code == 200:
-        all_books = response.json()
+    try:
+        # Eager Loading gọi 1 lần duy nhất để lấy tất cả sách
+        response = requests.get(f"{SITE_B_URL}/api/books/all", timeout=5)
+        network_calls += 1
         
-        # Map in-memory
-        books_by_author = {}
-        for book in all_books:
-            a_id = book['AuthorID']
-            if a_id not in books_by_author:
-                books_by_author[a_id] = []
-            books_by_author[a_id].append(book)
+        if response.status_code == 200:
+            all_books = response.json()
             
-        # Gán sách
+            # Map in-memory
+            books_by_author = {}
+            for book in all_books:
+                a_id = book['AuthorID']
+                if a_id not in books_by_author:
+                    books_by_author[a_id] = []
+                books_by_author[a_id].append(book)
+                
+            # Gán sách
+            for author in authors_to_fetch:
+                author['books'] = books_by_author.get(author['AuthorID'], [])
+                
+    except requests.exceptions.RequestException:
+        # Nếu Site B sập, toàn bộ tác giả đều bị thiếu thông tin sách
+        network_calls += 1
         for author in authors_to_fetch:
-            author['books'] = books_by_author.get(author['AuthorID'], [])
+            author['books'] = "LOI: Book Service Site B hien dang mat ket noi!"
             
     end_time = time.time()
     
@@ -89,7 +99,8 @@ def eager_loading():
         "strategy": "Eager Loading (1 Request Batch)",
         "authors_count": limit,
         "network_calls": network_calls,
-        "execution_time_ms": round((end_time - start_time) * 1000, 2)
+        "execution_time_ms": round((end_time - start_time) * 1000, 2),
+        "data": authors_to_fetch
     })
 
 if __name__ == '__main__':
