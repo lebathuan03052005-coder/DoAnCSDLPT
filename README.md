@@ -1,143 +1,69 @@
+# Đồ Án Cơ Sở Dữ Liệu Phân Tán: Phân Tích Hiệu Năng ORM
 
-# Demo: N+1 Query Problem - Lazy Loading vs Eager Loading
+## Sinh viên thực hiện: Lê Bá Thuần
 
-## Đề tài được thực hiện bởi: Lê Bá Thuần.
-## Với sự hướng dẫn của giảng viên: Lê Hà Thanh.
+## Giảng viên hướng dẫn: Lê Hà Thanh
 
-## Mô tả dự án
+## Môn học: Cơ sở dữ liệu phân tán
 
-Dự án demo so sánh hiệu suất giữa hai chiến lược truy xuất dữ liệu trong hệ thống Cơ sở dữ liệu phân tán:
+## Tổng quan dự án:
 
-- **Lazy Loading (N+1 Problem)**: Lấy danh sách tác giả, rồi với mỗi tác giả lại gọi 1 request qua mạng để lấy sách → Phát sinh quá nhiều network calls, chịu ảnh hưởng nặng nề bởi độ trễ mạng.
-- **Eager Loading (Batch/In-memory)**: Lấy toàn bộ sách cùng lúc bằng 1 request duy nhất, sau đó ánh xạ (map) dữ liệu bằng code → Tối thiểu hóa network calls, tốc độ vượt trội.
+### Đề tài:Dự án tập trung nghiên cứu sự ảnh hưởng của độ trễ mạng (Network Latency) trong các hệ thống phân tán khi sử dụng ORM. Đồ án so sánh hiệu năng giữa:
 
-*Điểm nổi bật:* Dự án sử dụng **2 Flask microservices** giao tiếp với nhau và có **tích hợp giả lập độ trễ mạng (50ms)** để phản ánh chân thực của môi trường phân tán thực tế.
+- Lazy Loading (N+1 Problem): Gây ra tình trạng quá tải số lượng truy vấn qua mạng.
 
----
+- Eager Loading (Select IN): Tối ưu hóa truy vấn bằng cách gom nhóm dữ liệu (Batch Loading).
 
-## Cách thức Cài đặt
+### Cấu trúc dự án
 
-### 1. Cài đặt dependencies
+Plaintext
+DEMODOAN/
+├── TaoDL_LuuVaoSQL/ # Chứa dữ liệu và script xử lý
+│ ├── authors.json # Dữ liệu tác giả
+│ ├── books.json # Dữ liệu sách
+│ ├── generate_data.py # Script sinh dữ liệu tự động
+│ └── import_data.py # Script nạp dữ liệu vào SQL Server
+├── app.py # API Service (Site A)
+├── database.py # Cấu hình kết nối SQL Server & ORM
+├── models.py # Định nghĩa các model (Author, Book)
+├── test_runner.py # Script chạy kịch bản đo lường & vẽ biểu đồ
+└── README.md # Tài liệu hướng dẫn
 
-```bash
-pip install -r requirements.txt
-pip install requests matplotlib
+### Quy trình triển khai (3 bước)
 
-```
+- Bước 1: Sinh dữ liệu thô:
+  Tạo file JSON chứa thông tin tác giả và sách:
 
-### 2. Sinh dữ liệu (lần đầu)
+Bash
+python TaoDL_LuuVaoSQL/generate_data.py
 
-```bash
-python generate_data.py
+- Bước 2: Nạp dữ liệu vào SQL Server
+  Bơm dữ liệu từ file JSON vào Database (Bulk Insert để tối ưu thời gian):
 
-```
+Bash
+python TaoDL_LuuVaoSQL/import_data.py
+Bước 3: Chạy hệ thống & Demo
+Chạy API Server:
 
-Kết quả sẽ sinh ra:
-
-* `data/authors.json` - 500 tác giả
-* `data/books.json` - 25,000 cuốn sách
-
----
-
-## Chạy dự án
-
-Để dự án hoạt động, bạn cần **mở 3 Terminal (Command Prompt) riêng biệt**:
-
-### Terminal 1: Chạy Site B (Books Service)
-
-```bash
-cd site_b_books
+Bash
 python app.py
+Chạy kịch bản đo lường:
 
-```
-> Kì vọng: `Book Service (Site B) đang chạy tại http://localhost:5002`
-
-### Terminal 2: Chạy Site A (Authors Service)
-
-```bash
-cd site_a_authors
-python app.py
-
-```
-
-> Kì vọng: `Author Service (Site A) đang chạy tại http://localhost:5001`
-
-### Terminal 3: Chạy Kịch bản Test Tự động & Vẽ biểu đồ 
-
-Đứng ở thư mục gốc của dự án, chạy lệnh:
-
-```bash
+Bash
 python test_runner.py
+Hệ thống sẽ tự động xuất file biểu đồ n_plus_1_problem_chart.png để so sánh hiệu năng.
 
-```
+⚙️ Các tính năng xử lý lỗi
+Fault Tolerance: Hệ thống được tích hợp cơ chế bắt lỗi OperationalError. Nếu Database (Site B) bị ngắt kết nối trong lúc demo, API sẽ trả về mã lỗi 503 kèm thông báo trạng thái, đảm bảo ứng dụng không bị crash.
 
-**Kết quả:**
-Script sẽ tự động đo lường thời gian chạy của cả 2 chiến lược với số lượng tác giả tăng dần (10, 30, 50, 100) và sinh ra file ảnh biểu đồ **`n_plus_1_problem_chart.png`** trực quan ngay tại thư mục gốc.
+Auto-Recovery: Khả năng kết nối lại và xử lý ngoại lệ giúp hệ thống phân tán duy trì tính ổn định.
 
----
+### Kết quả kiểm chứng
 
-## Test API thủ công (Bằng cURL)
+Bằng việc giả lập độ trễ mạng (50ms), đồ án cung cấp bằng chứng thực nghiệm về:
 
-Nếu muốn tự kiểm tra từng API riêng lẻ để xem cấu trúc JSON trả về:
+Sự suy giảm hiệu năng nghiêm trọng của Lazy Loading trong môi trường phân tán.
 
-### Kiểm tra Lazy Loading (N+1 Problem)
+Sự ưu việt của Eager Loading trong việc tối ưu hóa băng thông và thời gian thực thi.
 
-```bash
-curl "http://localhost:5001/test/lazy?limit=10"
-
-```
-
-**Lưu ý**: Với giả lập mạng 50ms, 10 tác giả (11 request) sẽ mất hơn nửa giây chỉ để chờ mạng.
-
-### Kiểm tra Eager Loading (Batch Loading)
-
-```bash
-curl "http://localhost:5001/test/eager?limit=10"
-
-```
-
-**Kết quả**: Nhanh hơn gấp nhiều lần vì luôn chỉ mất 1 lần độ trễ mạng duy nhất!
-
----
-
-## Cấu trúc file
-
-```text
-demoDoAn/
-├── README.md
-├── requirements.txt       # Dependencies
-├── generate_data.py       # Sinh dữ liệu test
-├── test_runner.py         # Kịch bản tự động test và vẽ biểu đồ báo cáo
-├── n_plus_1_problem_chart.png # (Tự động sinh ra) Biểu đồ kết quả test
-│
-├── site_a_authors/        # Microservice Authors (Site A)
-│   └── app.py             # Chứa /test/lazy & /test/eager
-│
-├── site_b_books/          # Microservice Books (Site B)
-│   └── app.py             # Chứa /api/books/* endpoints
-│
-└── data/                  # Dữ liệu (sinh từ generate_data.py)
-    ├── authors.json       # 500 tác giả
-    └── books.json         # 25,000 cuốn sách
-
-```
-
-## Tuỳ chỉnh
-
-### Thay đổi số lượng dữ liệu
-
-Mở `generate_data.py` và sửa:
-
-```python
-NUM_AUTHORS = 500      # Tăng giảm số tác giả
-NUM_BOOKS = 25000      # Tăng giảm số sách
-
-```
-
-Rồi chạy lại: `python generate_data.py`
-
-## Tài liệu tham khảo
-
-* [N+1 Query Problem](https://www.google.com/search?q=https://stackoverflow.com/questions/97197/what-is-the-n1-selects-problem)
-* [Flask Documentation](https://flask.palletsprojects.com/)
-* [Eager vs Lazy Loading](https://en.wikipedia.org/wiki/Lazy_loading)
+Đồ án môn Cơ sở dữ liệu phân tán - 2026

@@ -33,15 +33,12 @@ def generate_data():
             "CreatedAt": fake.date_time_this_decade().isoformat()
         })
 
-    # Tạo thư mục data nếu chưa có
-    os.makedirs('data', exist_ok=True)
-
     # Lưu ra file JSON
     print("Đang lưu ra file JSON...")
-    with open('data/authors.json', 'w', encoding='utf-8') as f:
+    with open('authors.json', 'w', encoding='utf-8') as f:
         json.dump(authors, f, ensure_ascii=False, indent=4)
         
-    with open('data/books.json', 'w', encoding='utf-8') as f:
+    with open('books.json', 'w', encoding='utf-8') as f:
         json.dump(books, f, ensure_ascii=False, indent=4)
 
     print(f"Hoàn tất! Đã tạo {len(authors)} authors và {len(books)} books.")
