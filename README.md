@@ -1,152 +1,421 @@
-# Đồ Án Cơ Sở Dữ Liệu Phân Tán: Phân Tích Hiệu Năng ORM
+# Đồ Án Cơ Sở Dữ Liệu Phân Tán: Phân Tích Hiệu Năng Trong Kiến Trúc Microservices
 
 **Sinh viên thực hiện:** Lê Bá Thuần
+**Mã sinh viên:** N23DCCN059
 **Giảng viên hướng dẫn:** Lê Hà Thanh
 **Môn học:** Cơ sở dữ liệu phân tán
-**Năm thực hiện:** 2026
 
 ---
 
-## Tổng quan dự án
+# 1. Giới thiệu
 
-Đề tài tập trung nghiên cứu ảnh hưởng của **độ trễ mạng (Network Latency)** trong các hệ thống cơ sở dữ liệu phân tán khi sử dụng ORM (Object Relational Mapping).
+Dự án nghiên cứu ảnh hưởng của độ trễ mạng (**Network Latency**) trong kiến trúc Microservices và cơ sở dữ liệu phân tán khi sử dụng ORM.
 
-Đồ án tiến hành so sánh hiệu năng giữa hai chiến lược truy xuất dữ liệu:
+Bài toán được khảo sát là **N+1 Query Problem**, thông qua việc so sánh hai chiến lược truy xuất dữ liệu:
 
-- **Lazy Loading (N+1 Problem):**
-  - Mỗi đối tượng liên quan được truy vấn riêng biệt.
-  - Làm gia tăng số lượng truy vấn qua mạng.
-  - Dẫn đến suy giảm hiệu năng trong môi trường phân tán.
+- **Lazy Loading (Sequential Fetching)**
+- **Eager Loading / Batch Loading (Select IN Strategy)**
 
-- **Eager Loading (Select IN / Batch Loading):**
-  - Gom nhóm dữ liệu và truy xuất theo lô.
-  - Giảm số lần giao tiếp giữa các Site.
-  - Tối ưu thời gian phản hồi và băng thông mạng.
+Mục tiêu của dự án là đánh giá tác động của số lượng round-trip mạng tới hiệu năng của hệ thống phân tán và chứng minh lợi ích của việc giảm số lượng message exchanges.
 
 ---
 
-## Cấu trúc dự án
+# 2. Kiến trúc hệ thống
 
-```text
+Hệ thống được xây dựng theo mô hình **Database-per-Service** nhằm đảm bảo tính độc lập giữa các dịch vụ.
+
+```
+                     API Gateway
+                     (Port 5000)
+                           |
+         --------------------------------------
+         |                                    |
+         |                                    |
+ Author Microservice                    Book Microservice
+     (Port 5001)                           (Port 5002)
+         |                                    |
+      AuthorDB                              BookDB
+```
+
+Trong đó:
+
+- **Author Service** quản lý dữ liệu tác giả.
+- **Book Service** quản lý dữ liệu sách.
+- **API Gateway** đóng vai trò Aggregator, tổng hợp dữ liệu từ nhiều dịch vụ.
+
+---
+
+# 3. Cấu trúc thư mục
+
+```
 DEMODOAN/
-├── TaoDL_LuuVaoSQL/
-│   ├── authors.json             # Dữ liệu tác giả
-│   ├── books.json               # Dữ liệu sách
-│   ├── generate_data.py         # Sinh dữ liệu tự động
-│   └── import_data.py           # Nạp dữ liệu vào SQL Server
 │
-├── app.py                       # API Service (Site A)
-├── database.py                  # Cấu hình kết nối SQL Server và ORM
-├── models.py                    # Định nghĩa các Model (Author, Book)
-├── test_runner.py               # Chạy kịch bản đo lường và vẽ biểu đồ
-└── README.md                    # Tài liệu hướng dẫn
+├── author/                  # Author Microservice (Port 5001)
+│
+├── book/                    # Book Microservice (Port 5002)
+│
+├── TaoDLvsNapDL/            # Scripts tạo và nạp dữ liệu
+│
+├── main_app.py             # API Gateway / Aggregator (Port 5000)
+│
+├── test_runner.py          # Benchmark và sinh biểu đồ
+│
+├── requirements.txt
+│
+└── README.md
 ```
 
 ---
 
-## Quy trình triển khai
+# 4. Cài đặt
 
-### Bước 1: Sinh dữ liệu
-
-Tạo dữ liệu tác giả và sách dưới dạng JSON:
+## Cài đặt thư viện
 
 ```bash
-python TaoDL_LuuVaoSQL/generate_data.py
+pip install -r requirements.txt
 ```
 
 ---
 
-### Bước 2: Nạp dữ liệu vào SQL Server
+# 5. Khởi tạo dữ liệu
 
-Import dữ liệu từ file JSON vào cơ sở dữ liệu bằng phương pháp Bulk Insert:
+Dữ liệu được lưu tách biệt theo mô hình Database-per-Service:
+
+- AuthorDB
+- BookDB
+
+Chạy các script tạo dữ liệu:
 
 ```bash
-python TaoDL_LuuVaoSQL/import_data.py
+python -m TaoDLvsNapDL.seeder_author
+python -m TaoDLvsNapDL.seeder_book
 ```
 
 ---
 
-### Bước 3: Chạy hệ thống và thực hiện Demo
+# 6. Khởi chạy hệ thống
 
-Khởi động API Server:
+Khởi động các Microservices ở ba cửa sổ Terminal riêng biệt.
+
+### Author Service
 
 ```bash
-python app.py
+python -m author.author_service
 ```
 
-Chạy kịch bản đo lường:
+Service chạy tại:
+
+```
+http://localhost:5001
+```
+
+---
+
+### Book Service
+
+```bash
+python -m book.book_service
+```
+
+Service chạy tại:
+
+```
+http://localhost:5002
+```
+
+---
+
+### API Gateway
+
+```bash
+python main_app.py
+```
+
+Gateway chạy tại:
+
+```
+http://localhost:5000
+```
+
+---
+
+# 7. Chiến lược truy xuất dữ liệu
+
+## 7.1 Lazy Loading
+
+Gateway lấy danh sách Authors trước, sau đó gửi từng request riêng biệt tới Book Service.
+
+```
+Author Service
+      ↓
+Book Service (Author 1)
+      ↓
+Book Service (Author 2)
+      ↓
+...
+      ↓
+Book Service (Author N)
+```
+
+Đặc điểm:
+
+- Phát sinh N+1 requests.
+- Số lượng round-trip lớn.
+- Hiệu năng suy giảm mạnh khi xuất hiện Network Latency.
+
+---
+
+## 7.2 Eager Loading (Batch Loading)
+
+Gateway gom nhóm các AuthorID và gửi một request duy nhất tới Book Service.
+
+```
+Author Service
+      ↓
+Book Service
+(SELECT ... WHERE AuthorID IN (...))
+```
+
+Đặc điểm:
+
+- Chỉ cần 2 requests.
+- Giảm số lần trao đổi message.
+- Tối ưu thời gian phản hồi.
+
+---
+
+# 8. Benchmark
+
+Chạy chương trình benchmark:
 
 ```bash
 python test_runner.py
 ```
 
-Sau khi hoàn tất, hệ thống sẽ tự động sinh biểu đồ:
+Kết quả sẽ sinh biểu đồ:
 
-```text
+```
 n_plus_1_problem_chart.png
 ```
 
-Biểu đồ dùng để so sánh hiệu năng giữa:
+Biểu đồ so sánh:
 
-- Lazy Loading (N+1 Problem)
-- Eager Loading (Batch Loading)
+- Lazy Loading
+- Eager Loading
 
----
-
-## Các cơ chế xử lý lỗi
-
-### Fault Tolerance
-
-Hệ thống được tích hợp cơ chế xử lý ngoại lệ `OperationalError`.
-
-Trong trường hợp Database (Site B) bị ngắt kết nối trong quá trình thực hiện:
-
-- API không bị dừng đột ngột.
-- Hệ thống trả về mã lỗi **503 Service Unavailable**.
-- Cung cấp thông báo trạng thái phù hợp cho người dùng.
+trong các điều kiện độ trễ mạng khác nhau.
 
 ---
 
-### Auto-Recovery
+# 9. Fault Tolerance
 
-Cơ chế bắt ngoại lệ và kết nối lại giúp:
+Hệ thống được thiết kế để hoạt động ổn định trong môi trường phân tán, nơi các Microservices có thể tạm thời mất kết nối hoặc ngừng hoạt động.
 
-- Duy trì tính ổn định của hệ thống phân tán.
-- Hạn chế gián đoạn dịch vụ.
-- Đảm bảo khả năng hoạt động liên tục của ứng dụng.
+## Fault Isolation
+
+API Gateway đóng vai trò trung gian giữa Client và các Microservices. Khi một dịch vụ con gặp sự cố, lỗi được cô lập tại dịch vụ đó và không làm sập toàn bộ hệ thống.
+
+### Trường hợp Author Service (Node A) không khả dụng
+
+Nếu Gateway không thể kết nối tới Author Service:
+
+```text
+ConnectionError
+```
+
+Gateway sẽ trả về:
+
+```http
+503 Service Unavailable
+```
+
+Ví dụ:
+
+```json
+{
+  "message": "Author Service (A) khong hoat dong"
+}
+```
+
+Do dữ liệu tác giả là điểm khởi đầu của quá trình tổng hợp dữ liệu, Gateway không thể tiếp tục xử lý yêu cầu.
 
 ---
 
-## Kết quả kiểm chứng
+### Trường hợp Book Service (Node B) không khả dụng
 
-Thông qua việc giả lập độ trễ mạng **50 ms**, đồ án đã cung cấp bằng chứng thực nghiệm cho thấy:
+#### Lazy Loading
 
-### Lazy Loading (N+1 Problem)
+Trong chiến lược Lazy Loading, Gateway thực hiện nhiều request độc lập tới Book Service.
 
-- Phát sinh số lượng lớn truy vấn giữa các Site.
-- Thời gian thực thi tăng mạnh khi độ trễ mạng xuất hiện.
-- Hiệu năng suy giảm đáng kể trong môi trường phân tán.
+Nếu Book Service bị ngắt kết nối trong quá trình xử lý, Gateway vẫn tiếp tục hoạt động và chỉ đánh dấu phần dữ liệu bị lỗi thay vì làm toàn bộ request thất bại.
 
-### Eager Loading (Batch Loading)
+Ví dụ:
 
-- Giảm số lần giao tiếp giữa các Site.
-- Tiết kiệm băng thông mạng.
-- Rút ngắn thời gian xử lý.
-- Đạt hiệu năng vượt trội so với Lazy Loading.
+```json
+{
+  "author": {
+    "AuthorID": 1,
+    "Name": "John"
+  },
+  "books": "Book Service (B) ngung hoat dong"
+}
+```
+
+Cơ chế này giúp:
+
+- Cô lập lỗi giữa các dịch vụ (Fault Isolation).
+- Gateway không bị crash.
+- Một phần dữ liệu vẫn được trả về cho Client.
 
 ---
 
-## Công nghệ sử dụng
+#### Eager Loading
+
+Trong chiến lược Eager Loading, toàn bộ dữ liệu sách được lấy bằng một request duy nhất.
+
+Nếu Book Service không khả dụng:
+
+```text
+ConnectionError
+```
+
+Gateway sẽ trả về:
+
+```http
+503 Service Unavailable
+```
+
+Ví dụ:
+
+```json
+{
+  "message": "Book Service (B) ngung hoat dong"
+}
+```
+
+---
+
+## Client-Side Join
+
+Do dữ liệu được lưu trên hai Database độc lập:
+
+- AuthorDB
+- BookDB
+
+Gateway không thực hiện Distributed JOIN ở tầng cơ sở dữ liệu.
+
+Thay vào đó, Gateway:
+
+1. Lấy dữ liệu Authors từ Author Service.
+2. Lấy dữ liệu Books từ Book Service.
+3. Thực hiện việc kết hợp dữ liệu trong RAM (Client-Side Join).
+
+```text
+Author Service
+       ↓
+Book Service
+       ↓
+API Gateway
+       ↓
+Client
+```
+
+Cách tiếp cận này mang lại các lợi ích:
+
+- Giảm sự phụ thuộc giữa các Database.
+- Tăng khả năng mở rộng (Scalability).
+- Dễ dàng thay đổi hoặc triển khai độc lập từng Microservice.
+- Phù hợp với mô hình Database-per-Service trong kiến trúc Microservices.
+
+---
+
+## Failure Scenario
+
+Một kịch bản lỗi được sử dụng trong quá trình kiểm thử là:
+
+```text
+Tắt Book Service (Port 5002)
+```
+
+Kết quả:
+
+- API Gateway vẫn hoạt động bình thường.
+- Không xảy ra hiện tượng crash toàn hệ thống.
+- Lỗi được giới hạn trong phạm vi Book Service.
+- Client nhận được thông báo lỗi hoặc dữ liệu không đầy đủ tùy theo chiến lược truy xuất dữ liệu.
+
+Điều này minh họa đặc tính Fault Tolerance và Fault Isolation của hệ thống phân tán.
+
+# 10. Kết quả thực nghiệm
+
+Khi mô phỏng độ trễ mạng 50 ms:
+
+### Lazy Loading
+
+- Thời gian phản hồi tăng gần tuyến tính theo số lượng Authors.
+- Phát sinh nhiều HTTP Requests.
+- Communication Cost chiếm ưu thế.
+
+### Eager Loading
+
+- Thời gian phản hồi ổn định.
+- Giảm đáng kể số lượng Round-trip.
+- Hiệu năng vượt trội trong môi trường phân tán.
+
+---
+
+# 11. Kết luận
+
+Đồ án chứng minh rằng trong hệ thống phân tán, việc tối ưu số lượng message exchanges quan trọng hơn việc chỉ tối ưu truy vấn SQL cục bộ.
+
+Việc chuyển từ:
+
+```
+Lazy Loading
+```
+
+sang:
+
+```
+Eager Loading (Batch Query)
+```
+
+kết hợp với:
+
+```
+API Aggregation
+```
+
+giúp:
+
+- Giảm Communication Cost.
+- Giảm số lượng Round-trip.
+- Cải thiện thời gian phản hồi.
+- Tăng khả năng mở rộng của kiến trúc Microservices.
+
+---
+
+# Công nghệ sử dụng
 
 - Python
 - Flask
 - SQLAlchemy ORM
 - SQL Server
-- PyODBC
+- REST API
 - Matplotlib
+- Requests
 
 ---
 
-## Kết luận
+# Chủ đề liên quan
 
-Đồ án đã chứng minh rằng trong môi trường cơ sở dữ liệu phân tán có độ trễ mạng, việc sử dụng **Eager Loading (Batch Loading)** giúp giảm đáng kể số lượng truy vấn qua mạng và cải thiện hiệu năng so với **Lazy Loading (N+1 Problem)**, từ đó nâng cao hiệu quả hoạt động của các hệ thống phân tán sử dụng ORM.
+- Distributed Database Systems
+- Distributed Query Processing
+- Communication Cost
+- Network Latency
+- N+1 Query Problem
+- Batch Query
+- API Aggregation Pattern
+- Database-per-Service Architecture
+- Fault Tolerance
+- Microservices Architecture
