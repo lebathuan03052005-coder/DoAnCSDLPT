@@ -1,10 +1,12 @@
-# Đồ Án Cơ Sở Dữ Liệu Phân Tán: Phân Tích Hiệu Năng Trong Kiến Trúc Microservices
+# Đồ Án Cơ Sở Dữ Liệu Phân Tán: Phân tích vấn đề N+1 trong hệ cơ sở dữ liệu phân tán dưới ảnh hưởng của độ trễ mạng.
+
+---
+
+**Giảng viên hướng dẫn:** Lê Hà Thanh
 
 **Sinh viên thực hiện:** Lê Bá Thuần
 
 **Mã sinh viên:** N23DCCN059
-
-**Giảng viên hướng dẫn:** Lê Hà Thanh
 
 **Môn học:** Cơ sở dữ liệu phân tán
 
