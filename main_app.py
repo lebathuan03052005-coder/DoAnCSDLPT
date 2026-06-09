@@ -12,8 +12,8 @@ def test_lazy():
     
     # 1. Lấy danh sách tác giả (Service A)
     try:
-        authors = requests.get("http://localhost:5001/authors").json()
-        authors = authors[:limit]
+        authors = requests.get(
+    f"http://localhost:5001/authors?limit={limit}").json()
         network_calls += 1
     except requests.exceptions.ConnectionError:
         return jsonify({"message": "Author Service (A) không khả dụng"}), 503
@@ -46,8 +46,8 @@ def test_eager():
     
     # 1. Lấy danh sách tác giả (Service A)
     try:
-        authors = requests.get("http://localhost:5001/authors").json()
-        authors = authors[:limit]
+        authors = requests.get(
+    f"http://localhost:5001/authors?limit={limit}").json()
         network_calls += 1
     except requests.exceptions.ConnectionError:
         return jsonify({"message": "Author Service (A) khong hoat dong"}), 503

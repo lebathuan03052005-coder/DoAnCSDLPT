@@ -1,16 +1,27 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from author_database import AuthorSessionLocal
 from author_models import Author
 
 app = Flask(__name__)
 
-@app.route('/authors', methods=['GET'])
+@app.route('/authors')
 def get_authors():
+
+    limit = int(request.args.get('limit', 10))
+
     session = AuthorSessionLocal()
+
     try:
-        # Query authors
-        authors = session.query(Author).all()
-        return jsonify([{"AuthorID": a.AuthorID, "Name": a.Name} for a in authors])
+        authors = session.query(Author).limit(limit).all()
+
+        return jsonify([
+            {
+                "AuthorID": a.AuthorID,
+                "Name": a.Name
+            }
+            for a in authors
+        ])
+
     finally:
         session.close()
 

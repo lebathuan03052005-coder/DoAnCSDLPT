@@ -6,8 +6,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from author.author_database import AuthorSessionLocal, Base, author_engine
 from author.author_models import Author
 
-
+# Xóa bảng cũ nếu tồn tại và tạo lại bảng mới
 Base.metadata.drop_all(bind=author_engine)
+# Tạo bảng trong AuthorDB
 Base.metadata.create_all(bind=author_engine)
 
 def import_authors():
