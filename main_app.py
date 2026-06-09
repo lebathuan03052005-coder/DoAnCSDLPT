@@ -64,7 +64,14 @@ def test_eager():
         results = [{"author": a, "books": [b for b in books if b['AuthorID'] == a['AuthorID']]} for a in authors]
         
     except requests.exceptions.ConnectionError:
-        return jsonify({"message": "Book Service (B) ngung hoat dong"}), 503
+        results = [
+            {
+            "author": a,
+            "books": [],
+            "status": "Book Service (B) ngung hoat dong"
+         }
+         for a in authors
+        ]
         
     execution_time_ms = (time.time() - start_time) * 1000
     return jsonify({

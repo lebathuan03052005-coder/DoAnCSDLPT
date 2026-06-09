@@ -18,8 +18,8 @@ Dự án nghiên cứu ảnh hưởng của độ trễ mạng (**Network Latenc
 
 Bài toán được khảo sát là **N+1 Query Problem**, thông qua việc so sánh hai chiến lược truy xuất dữ liệu:
 
-- **Lazy Loading (Sequential Fetching)**
-- **Eager Loading / Batch Loading (Select IN Strategy)**
+- **Lazy Loading (N+1 Query)**
+- **Eager Loading (Batch Query)**
 
 Mục tiêu của dự án là đánh giá tác động của số lượng round-trip mạng tới hiệu năng của hệ thống phân tán và chứng minh lợi ích của việc giảm số lượng message exchanges.
 
@@ -89,7 +89,13 @@ Dữ liệu được lưu tách biệt theo mô hình Database-per-Service:
 - AuthorDB
 - BookDB
 
-Chạy các script tạo dữ liệu:
+Chạy các script khởi tạo dữ liệu:
+
+```bash
+python -m TaoDLvsNapDL.grenerate_data
+```
+
+Chạy các script nap dữ liệu:
 
 ```bash
 python -m TaoDLvsNapDL.seeder_author
@@ -216,7 +222,7 @@ trong các điều kiện độ trễ mạng khác nhau.
 
 Hệ thống được thiết kế để hoạt động ổn định trong môi trường phân tán, nơi các Microservices có thể tạm thời mất kết nối hoặc ngừng hoạt động.
 
-## Fault Isolation
+## Fault Isolation (cô lập lỗi)
 
 API Gateway đóng vai trò trung gian giữa Client và các Microservices. Khi một dịch vụ con gặp sự cố, lỗi được cô lập tại dịch vụ đó và không làm sập toàn bộ hệ thống.
 
@@ -294,7 +300,12 @@ Ví dụ:
 
 ```json
 {
-  "message": "Book Service (B) ngung hoat dong"
+  "author": {
+    "AuthorID": "A001",
+    "AuthorName": "Nguyen Van A"
+  },
+  "books": [],
+  "status": "Book Service (B) ngung hoat dong"
 }
 ```
 
@@ -411,16 +422,3 @@ giúp:
 - Requests
 
 ---
-
-# Chủ đề liên quan
-
-- Distributed Database Systems
-- Distributed Query Processing
-- Communication Cost
-- Network Latency
-- N+1 Query Problem
-- Batch Query
-- API Aggregation Pattern
-- Database-per-Service Architecture
-- Fault Tolerance
-- Microservices Architecture
